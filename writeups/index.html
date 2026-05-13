@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Tony Chong's cybersecurity writeups — CTF solutions, vulnerability research and penetration testing notes." />
+  <title>Writeups | Tony Chong</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="../css/writeups.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+  <!-- ── Navbar ─────────────────────────────────────────── -->
+  <nav class="navbar scrolled" id="navbar">
+    <div class="nav-container">
+      <a href="../index.html" class="nav-logo">
+        <span class="bracket">[</span>Tony<span class="accent">.</span>Chong<span class="bracket">]</span>
+      </a>
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="../index.html#home"       class="nav-link">Home</a></li>
+        <li><a href="../index.html#about"      class="nav-link">About</a></li>
+        <li><a href="../index.html#skills"     class="nav-link">Skills</a></li>
+        <li><a href="../index.html#experience" class="nav-link">Experience</a></li>
+        <li><a href="../index.html#education"  class="nav-link">Education</a></li>
+        <li><a href="index.html"               class="nav-link nav-wu active">Writeups</a></li>
+        <li><a href="../index.html#contact"    class="nav-link">Contact</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- ── Page hero ──────────────────────────────────────── -->
+  <section class="wu-page-hero">
+    <div class="container">
+      <div class="back-link"><a href="../index.html">← Back to Portfolio</a></div>
+      <h1>Cybersecurity <span class="accent">Writeups</span></h1>
+      <p class="wu-page-hero-sub">CTF solutions, vulnerability research, and penetration testing notes.</p>
+      <div class="wu-stats">
+        <div class="wu-stat">
+          <span class="wu-stat-num" id="wuTotal">0</span>
+          <span class="wu-stat-label">Writeups</span>
+        </div>
+        <div class="wu-stat">
+          <span class="wu-stat-num">CTF</span>
+          <span class="wu-stat-label">Focus</span>
+        </div>
+        <div class="wu-stat">
+          <span class="wu-stat-num accent">Active</span>
+          <span class="wu-stat-label">Status</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Filter & Search ────────────────────────────────── -->
+  <div class="wu-controls">
+    <div class="container">
+      <div class="controls-row">
+        <div class="filter-tags">
+          <button class="filter-btn active" data-filter="all">All</button>
+          <button class="filter-btn" data-filter="ctf">CTF</button>
+          <button class="filter-btn" data-filter="web">Web</button>
+          <button class="filter-btn" data-filter="network">Network</button>
+          <button class="filter-btn" data-filter="forensics">Forensics</button>
+          <button class="filter-btn" data-filter="pwn">Pwn / Rev</button>
+          <button class="filter-btn" data-filter="misc">Misc</button>
+        </div>
+        <div class="search-wrap">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="wuSearch" placeholder="Search writeups…" autocomplete="off" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Writeups grid ──────────────────────────────────── -->
+  <main class="wu-main">
+    <div class="container">
+
+      <!-- Empty state — shown until you add real writeups -->
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon">🔐</div>
+        <h2>Writeups Coming Soon</h2>
+        <p>CTF writeups and security research will appear here.</p>
+        <p class="empty-note">
+          To add a writeup: copy <code>writeup-template.html</code>, fill it in,
+          then add a card below by duplicating the example comment block.
+        </p>
+      </div>
+
+      <div class="wu-grid" id="wuGrid">
+
+        <!--
+        ════════════════════════════════════════════════════
+         HOW TO ADD A WRITEUP
+        ════════════════════════════════════════════════════
+         1. Duplicate writeup-template.html → e.g. thm-room-name.html
+         2. Fill in your content.
+         3. Copy the <a> card block below, remove the class "wu-example",
+            and update href / data-tags / data-title and the card body.
+         4. Save — it will appear in the grid automatically.
+        ════════════════════════════════════════════════════
+
+        EXAMPLE CARD (hidden — class wu-example keeps it out of the count):
+
+        <a href="thm-room-name.html"
+           class="wu-card-link wu-example"
+           data-tags="ctf web"
+           data-title="TryHackMe: Room Name">
+          <div class="wc-top">
+            <div class="wc-tags">
+              <span class="wc-tag">CTF</span>
+              <span class="wc-tag">Web</span>
+            </div>
+            <span class="wc-diff easy">Easy</span>
+          </div>
+          <h3 class="wc-title">TryHackMe: Room Name</h3>
+          <p class="wc-excerpt">
+            Brief description of the challenge — what the goal was,
+            the vulnerability exploited, and what you learned.
+          </p>
+          <div class="wc-footer">
+            <span>TryHackMe</span>
+            <span>May 2026</span>
+          </div>
+        </a>
+        -->
+
+      </div>
+
+      <div class="no-results" id="noResults" style="display:none">
+        <p>No writeups match your search.</p>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- ── Footer ─────────────────────────────────────────── -->
+  <footer class="footer">
+    <div class="container">
+      <p class="footer-logo"><span class="bracket">[</span>Tony<span class="accent">.</span>Chong<span class="bracket">]</span></p>
+      <p class="footer-sub">© 2026 Chong Tsz Chung (Tony). All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="../js/script.js"></script>
+  <script src="../js/writeups.js"></script>
+</body>
+</html>

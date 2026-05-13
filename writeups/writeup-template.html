@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>[Challenge Name] | Tony Chong Writeups</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="../css/writeups.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+  <!-- ── Navbar ─────────────────────────────────────────── -->
+  <nav class="navbar scrolled" id="navbar">
+    <div class="nav-container">
+      <a href="../index.html" class="nav-logo">
+        <span class="bracket">[</span>Tony<span class="accent">.</span>Chong<span class="bracket">]</span>
+      </a>
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="../index.html" class="nav-link">Home</a></li>
+        <li><a href="index.html"    class="nav-link nav-wu active">Writeups</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- ── Writeup article ────────────────────────────────── -->
+  <article class="wu-article">
+
+    <!-- Back link -->
+    <div class="back-link"><a href="index.html">← Back to Writeups</a></div>
+
+    <!-- Header -->
+    <header class="wu-article-header">
+      <div class="wu-article-tags">
+        <!-- Add / remove tags as needed -->
+        <span class="wc-tag">CTF</span>
+        <span class="wc-tag">Web</span>
+        <!-- Difficulty: easy | medium | hard | insane -->
+        <span class="wc-diff medium">Medium</span>
+      </div>
+      <h1 class="wu-article-title">[Challenge / Room Name]</h1>
+      <div class="wu-article-meta">
+        <span>📅 [Month Year]</span>
+        <span>🏆 [Platform — TryHackMe / HackTheBox / PicoCTF / etc.]</span>
+        <span>🔖 [Category]</span>
+      </div>
+    </header>
+
+    <!-- Body — fill in your writeup here -->
+    <div class="wu-body">
+
+      <h2>Overview</h2>
+      <p>
+        Brief description of the challenge or machine. What was the goal?
+        What vulnerability or technique was involved?
+      </p>
+
+      <h2>Enumeration / Recon</h2>
+      <p>Describe your initial reconnaissance steps.</p>
+      <pre><code>nmap -sV -sC -p- &lt;TARGET_IP&gt;</code></pre>
+      <p>What did you find?</p>
+
+      <h2>Exploitation</h2>
+      <h3>Step 1 — [Step Title]</h3>
+      <p>Describe what you did and why.</p>
+      <pre><code># example command
+python3 exploit.py --target &lt;TARGET_IP&gt; --port 8080</code></pre>
+
+      <h3>Step 2 — [Step Title]</h3>
+      <p>Continue the walkthrough…</p>
+
+      <h2>Post-Exploitation / Privilege Escalation</h2>
+      <p>Describe PrivEsc steps if applicable.</p>
+      <pre><code>sudo -l
+# or
+linpeas.sh</code></pre>
+
+      <h2>Flags</h2>
+      <ul>
+        <li><strong>User flag:</strong> <code>obtained ✓</code></li>
+        <li><strong>Root flag:</strong> <code>obtained ✓</code></li>
+      </ul>
+
+      <h2>Lessons Learned</h2>
+      <p>
+        What did this challenge teach you? Any new tools or techniques?
+      </p>
+      <blockquote>
+        Key takeaway from this writeup.
+      </blockquote>
+
+      <h2>Tools Used</h2>
+      <ul>
+        <li>Nmap</li>
+        <li>Burp Suite</li>
+        <li><!-- add more --></li>
+      </ul>
+
+    </div>
+
+    <!-- Navigation -->
+    <nav class="wu-article-nav">
+      <a href="index.html" class="btn btn-ghost">← All Writeups</a>
+      <!-- Uncomment to link to next/previous writeup:
+      <a href="next-writeup.html" class="btn btn-outline">Next Writeup →</a>
+      -->
+    </nav>
+
+  </article>
+
+  <!-- ── Footer ─────────────────────────────────────────── -->
+  <footer class="footer">
+    <div class="container">
+      <p class="footer-logo"><span class="bracket">[</span>Tony<span class="accent">.</span>Chong<span class="bracket">]</span></p>
+      <p class="footer-sub">© 2026 Chong Tsz Chung (Tony). All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="../js/script.js"></script>
+</body>
+</html>
