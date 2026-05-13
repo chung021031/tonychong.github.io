@@ -790,10 +790,15 @@ strong.accent {
 }
 
 .wu-cards {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
     gap: 1.2rem;
     margin-bottom: 2.4rem;
+}
+
+.wu-card {
+    flex: 0 1 320px;
 }
 
 .wu-card {
@@ -960,7 +965,8 @@ strong.accent {
     }
 
     .wu-cards {
-        grid-template-columns: 1fr;
+        flex-direction: column;
+        align-items: center;
     }
 }
 
