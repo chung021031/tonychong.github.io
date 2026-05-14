@@ -369,14 +369,14 @@ strong.accent {
 
 /* Terminal widget */
 .terminal {
-    flex: 0 0 370px;
+    flex: 0 0 460px;
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     overflow: hidden;
     box-shadow: var(--shadow), var(--glow);
     font-family: var(--mono);
-    font-size: .83rem;
+    font-size: 1rem;
 }
 
 .terminal-bar {
@@ -838,8 +838,10 @@ strong.accent {
 /* ── Contact ───────────────────────────────────────────── */
 .contact-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1.2rem;
+    max-width: 760px;
+    margin: 0 auto;
 }
 
 .contact-card {
@@ -949,7 +951,7 @@ strong.accent {
     .terminal {
         flex: none;
         width: 100%;
-        max-width: 460px;
+        max-width: 575px;
     }
 
     .about-grid {
