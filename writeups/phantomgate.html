@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PhantomGate v1.0 | Tony Chong Writeups</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="../css/writeups.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+  <!-- ── Navbar ─────────────────────────────────────────── -->
+  <nav class="navbar scrolled" id="navbar">
+    <div class="nav-container">
+      <a href="../index.html" class="nav-logo">
+        <span class="bracket">[</span>Tony<span class="accent">.</span>Chong<span class="bracket">]</span>
+      </a>
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="../index.html" class="nav-link">Home</a></li>
+        <li><a href="index.html"    class="nav-link nav-wu active">Writeups</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- ── Writeup article ────────────────────────────────── -->
+  <article class="wu-article">
+
+    <div class="back-link"><a href="index.html">← Back to Writeups</a></div>
+
+    <header class="wu-article-header">
+      <div class="wu-article-tags">
+        <span class="wc-tag">Crackme</span>
+        <span class="wc-tag">Rev</span>
+        <span class="wc-diff medium">Medium</span>
+      </div>
+      <h1 class="wu-article-title">PhantomGate v1.0</h1>
+      <div class="wu-article-meta">
+        <span>📅 May 2026</span>
+        <span>🏆 crackmes.one — AdminX</span>
+        <span>🔖 Reverse Engineering</span>
+      </div>
+    </header>
+
+    <div class="wu-body">
+
+      <h2>Overview</h2>
+      <p>
+        PhantomGate is a 64-bit Windows crackme that demands a serial key in a four-group
+        dash-separated format. What makes it interesting is that the validation logic is not a
+        simple comparison — it is run inside a custom stack-based virtual machine, and the serial
+        groups are encoded in a non-standard base-25 alphabet. Getting a valid key requires
+        understanding both the encoding scheme and the VM computation, then using Z3 to satisfy the
+        final constraint.
+      </p>
+      <p>
+        The serial format the program expects:
+      </p>
+      <pre><code>XXXXX-XXXXX-XXXXX-XXXXX</code></pre>
+      <p>A working serial:</p>
+      <pre><code>4QJCG-P4R7Y-3VMY7-XRWHM</code></pre>
+
+      <h2>Step 1 — Anti-Debug Check</h2>
+      <p>
+        The very first thing <code>main</code> does before touching the serial input is run an
+        anti-debug check. If a debugger is detected, the low bit of the first parsed group value
+        gets flipped — silently corrupting the input so the VM equation can never be satisfied.
+        The check itself does not crash or exit; it just poisons the data. Analyzing statically
+        avoids this entirely.
+      </p>
+
+      <h2>Step 2 — Parsing the Serial</h2>
+      <p>
+        The input is validated to be longer than <code>0x16</code> characters, with dashes sitting
+        at offsets 5, 11, and 17 — splitting the string into four 5-character groups.
+      </p>
+      <pre><code>group0 - group1 - group2 - group3</code></pre>
+      <p>
+        Each group is decoded by a function (<code>sub_1400014C0</code>) using this custom
+        alphabet:
+      </p>
+      <pre><code>ACDEFGHJKLMNPQRTUVWXY3479</code></pre>
+      <p>
+        That is 25 characters, so each group is essentially a base-25 number. The accumulation
+        formula is:
+      </p>
+      <pre><code>value = value * 25 + index</code></pre>
+      <p>
+        where <code>index</code> is the character's position in the alphabet above. Four groups
+        produce four 32-bit integers.
+      </p>
+
+      <h2>Step 3 — The Virtual Machine</h2>
+      <p>
+        The four decoded integers are loaded into VM registers 0–3. The program then constructs
+        a bytecode sequence on the fly and hands it to a small stack-based interpreter. Tracing
+        through the executed instructions and collapsing them into a single expression yields:
+      </p>
+      <pre><code>target = 0x02D8EEC79A0331D6
+
+v4 = (n0 * 2654435769) ^ n1
+v5 = ror64(v4, 17) + n2
+v6 = v5 ^ (n3 * 1818371886)
+v7 = v6 ^ 2882400001
+
+assert v7 == target   # all arithmetic mod 2^64</code></pre>
+      <p>
+        All four constants — the multipliers, the rotate amount, the XOR mask, and the target —
+        are baked into the bytecode. The VM is single-purpose; it exists just to obscure what is
+        essentially one equation.
+      </p>
+
+      <h2>Step 4 — Solving with Z3</h2>
+      <p>
+        Each group value is bounded by the base-25 range:
+        <code>0 &lt;= n &lt;= 25^5 − 1</code>. Plugging the equation and bounds into Z3 and
+        asking for a satisfying model is straightforward:
+      </p>
+      <pre><code>from z3 import BitVec, BitVecVal, Solver, ULE, ZeroExt, RotateRight, sat
+
+ALPHABET = "ACDEFGHJKLMNPQRTUVWXY3479"
+BASE = len(ALPHABET)
+GROUP_LEN = 5
+MAX_GROUP_VALUE = BASE**GROUP_LEN - 1
+
+def encode_group(value: int) -> str:
+    out = []
+    for _ in range(GROUP_LEN):
+        value, digit = divmod(value, BASE)
+        out.append(ALPHABET[digit])
+    return "".join(reversed(out))
+
+parsed = [BitVec(f"p{i}", 32) for i in range(4)]
+n = [ZeroExt(32, x) for x in parsed]
+
+s = Solver()
+for x in parsed:
+    s.add(ULE(x, MAX_GROUP_VALUE))
+
+expr = RotateRight((n[0] * BitVecVal(2654435769, 64)) ^ n[1], 17)
+expr = expr + n[2]
+expr = expr ^ (n[3] * BitVecVal(1818371886, 64))
+expr = expr ^ BitVecVal(2882400001, 64)
+s.add(expr == BitVecVal(0x02D8EEC79A0331D6, 64))
+
+assert s.check() == sat
+m = s.model()
+groups = [m[x].as_long() for x in parsed]
+serial = "-".join(encode_group(x) for x in groups)
+print(serial)</code></pre>
+      <p>
+        One satisfying model produces the group values <code>[8801280, 5040595, 8475523, 7652035]</code>,
+        which encode back to:
+      </p>
+      <pre><code>4QJCG-P4R7Y-3VMY7-XRWHM</code></pre>
+      <p>
+        Worth noting: the constraint is under-determined. Z3 finds <em>one</em> valid serial out
+        of potentially many — other serials that satisfy the same equation are equally correct.
+      </p>
+
+      <h2>Verification</h2>
+      <pre><code>PhantomGate v1.0 -- Reverse Engineering Challenge
+Enter serial (XXXXX-XXXXX-XXXXX-XXXXX): 4QJCG-P4R7Y-3VMY7-XRWHM
+[+] Access Granted!  The gate yields.  Well played, Reverser.</code></pre>
+
+      <h2>Key Takeaways</h2>
+      <ul>
+        <li>The anti-debug silently corrupts data rather than terminating — static analysis sidesteps it completely.</li>
+        <li>Custom alphabets and base-N encoding are a common way to make serials look opaque without heavy crypto.</li>
+        <li>Once a VM's bytecode is fully reduced to a closed-form expression, Z3 can solve it trivially with bit-vector constraints.</li>
+      </ul>
+
+      <h2>Tools Used</h2>
+      <ul>
+        <li>IDA Pro (static analysis, VM tracing)</li>
+        <li>Z3 (Python bindings — constraint solving)</li>
+      </ul>
+
+    </div>
+
+    <nav class="wu-article-nav">
+      <a href="index.html" class="btn btn-ghost">← All Writeups</a>
+    </nav>
+
+  </article>
+
+  <footer class="footer">
+    <div class="container">
+      <p class="footer-logo"><span class="bracket">[</span>Tony<span class="accent">.</span>Chong<span class="bracket">]</span></p>
+      <p class="footer-sub"></p>
+    </div>
+  </footer>
+
+  <script src="../js/script.js"></script>
+</body>
+</html>

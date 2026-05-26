@@ -1,0 +1,16 @@
+Writeup author:
+discord: pwn.by (905573931098996806)
+
+Correct Flag: KARITY{secyh>pnnss(g6>* :e>@&>:\-rt}
+
+Karity-crackme-B Writeup
+
+So, I started digging into this 64-bit Windows crackme written in C++. The binary asks for a 36-character input and then runs it through some weird crypto routine to see if we get the flag right.
+
+First off, I threw it into IDA Pro to look at the main function. Right away, I noticed two strict limits. The input has to be exactly 36 characters long, or it kicks us out. Then, there is this quick loop checking indices 7, 8, and 9. It XORs them with 0x59 and compares them to a hardcoded string. After doing the math, it turns out input[7:10] must be exactly sec. Since the flag format is KARITY{...}, we instantly know the flag starts with KARITY{sec.
+
+Next, I jumped into the main validation function. This thing is basically a non-linear avalanche mixer that messes with a 16-byte state buffer, starting from all zeros. For every single character we type, it loops 16 times to mix the bytes up. The core of this is a custom multiplication algorithm using pre-defined exponential and logarithmic tables. It looks exactly like Galois Field GF(2^8) math, the kind of stuff you see in AES encryption.
+
+But here is where the author tried to trick us. I ran into two nasty traps. First, the exponent table in rdata actually had repeating 13-byte chunks. Because the program builds the log table dynamically at startup, those duplicates overwrite the previous values, completely breaking the usual field linearity. Second, there was a sneaky C++ integer promotion issue. The program adds logs using 32-bit registers before doing the modulo operation. If you model this using regular 8-bit overflows, your equations just break.
+
+To solve this without losing my mind, I wrote a Z3 script in Python. At first, the solver just hung because the formulas were too heavy with all that non-linear stuff. So I optimized it by pre-computing dedicated Look-Up Tables in Python for all 16 constants in the mixing matrix. This turned the heavy math into simple array lookups. I threw it at the QF_BV bit-vector engine, and Z3 cracked the equations and spat out the flag in less than two seconds.

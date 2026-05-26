@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>karity-crackme-B | Tony Chong Writeups</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="../css/writeups.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+  <!-- ── Navbar ─────────────────────────────────────────── -->
+  <nav class="navbar scrolled" id="navbar">
+    <div class="nav-container">
+      <a href="../index.html" class="nav-logo">
+        <span class="bracket">[</span>Tony<span class="accent">.</span>Chong<span class="bracket">]</span>
+      </a>
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="../index.html" class="nav-link">Home</a></li>
+        <li><a href="index.html"    class="nav-link nav-wu active">Writeups</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- ── Writeup article ────────────────────────────────── -->
+  <article class="wu-article">
+
+    <div class="back-link"><a href="index.html">← Back to Writeups</a></div>
+
+    <header class="wu-article-header">
+      <div class="wu-article-tags">
+        <span class="wc-tag">Crackme</span>
+        <span class="wc-tag">Rev</span>
+        <span class="wc-diff hard">Hard</span>
+      </div>
+      <h1 class="wu-article-title">karity-crackme-B</h1>
+      <div class="wu-article-meta">
+        <span>📅 May 2026</span>
+        <span>🏆 crackmes.one — karity</span>
+        <span>🔖 Reverse Engineering</span>
+      </div>
+    </header>
+
+    <div class="wu-body">
+
+      <h2>Overview</h2>
+      <p>
+        karity-crackme-B is a 64-bit Windows crackme written in C++. It asks for a 36-character
+        input, runs it through a custom mixing function that closely resembles Galois Field
+        GF(2&#x00B2;&#x2078;) arithmetic, and compares the resulting 16-byte state against a
+        hardcoded hash. Two subtle bugs in the implementation — a corrupted exponent table and
+        an integer promotion issue — make naive symbolic solving hang indefinitely. The fix is
+        to pre-compute dedicated look-up tables for every field constant and hand those to the
+        QF_BV solver.
+      </p>
+      <p>
+        <strong>Flag:</strong> <code>KARITY{secyh&gt;pnnss(g6&gt;* :e&gt;@&amp;&gt;:\-rt}</code>
+      </p>
+
+      <h2>Step 1 — Input Constraints</h2>
+      <p>
+        The first thing <code>main</code> enforces is a hard length limit: the input must be
+        exactly 36 characters. Any other length exits immediately.
+      </p>
+      <p>
+        The next thing is a partial known-plaintext leak. A short loop reads indices 7, 8, and 9,
+        XORs each byte with <code>0x59</code>, and compares the result against a hardcoded string.
+        Working backwards:
+      </p>
+      <pre><code>input[7] ^ 0x59 == expected[0]   →   input[7:10] == "sec"</code></pre>
+      <p>
+        Combined with the visible flag format <code>KARITY{...}</code>, we know the flag starts
+        with <code>KARITY{sec</code> and ends with <code>}</code> at position 35. That anchors
+        11 bytes before touching the heavy crypto.
+      </p>
+
+      <h2>Step 2 — The Mixing Function (GF(2⁸) Arithmetic)</h2>
+      <p>
+        The main validation function maintains a 16-byte state buffer, initialised to all zeros.
+        For every input character, it loops 16 times and updates individual state bytes using a
+        custom multiplication routine. The core of that routine — exponential and logarithmic
+        look-up tables used to turn field multiplication into addition of logarithms — is
+        textbook GF(2&#x00B2;&#x2078;), the same field used in AES MixColumns.
+      </p>
+      <p>
+        The mixing step for each character at position <code>v1</code> in the input:
+      </p>
+      <pre><code>for each of 16 update rounds:
+    state[idx] = GF_mul(state[idx], matrix_constant[k]) ^ input_char</code></pre>
+      <p>
+        where <code>matrix_constant</code> is the 16-byte little-endian encoding of two
+        hardcoded 64-bit values:
+      </p>
+      <pre><code>v41 = 0x026B703D14FC4C9A
+v42 = 0x5FE21933C7A15581</code></pre>
+
+      <h2>Step 3 — Two Hidden Traps</h2>
+      <h3>Trap 1 — Corrupted Exponent Table</h3>
+      <p>
+        The exponent table in <code>.rdata</code> has 256 entries, but it contains repeating
+        13-byte chunks starting at offset 96. Because the program rebuilds the log table
+        <em>dynamically</em> at startup by iterating over the exponent table, the duplicate
+        entries overwrite earlier log values — producing a non-invertible, non-linear mapping
+        that has nothing to do with a standard GF(2&#x00B2;&#x2078;) field. Any solver that
+        assumes clean field math will produce wrong results.
+      </p>
+      <h3>Trap 2 — C++ Integer Promotion</h3>
+      <p>
+        When computing the log sum <code>LOG[a] + LOG[c]</code> before taking it modulo 255,
+        the program performs the addition in 32-bit registers rather than 8-bit. This means
+        the intermediate sum can exceed 255 before the modulo, producing a different result than
+        a pure 8-bit wrap. Modelling the multiplication using byte-width arithmetic silently
+        breaks the equations.
+      </p>
+
+      <h2>Step 4 — Solver Strategy</h2>
+      <p>
+        A naive Z3 model with symbolic GF multiplications hits a combinatorial wall immediately —
+        the non-linear field operations across 36 characters and 16 state bytes produce
+        constraints too heavy for the general solver.
+      </p>
+      <p>
+        The fix: pre-compute a concrete 256-entry look-up table for each of the 16 matrix
+        constants using the <em>actual</em> (corrupted) tables and the 32-bit addition semantics,
+        then expose those to Z3 as static arrays. Every field multiply in the symbolic model
+        becomes a simple array read — the solver only sees linear <code>XOR</code> operations
+        and array selects, which QF_BV handles in under two seconds.
+      </p>
+      <pre><code># Build the real log table from the corrupted exp table
+LOG_DATA = [0] * 256
+for i in range(255):
+    LOG_DATA[EXP_DATA[i]] = i   # later entries overwrite earlier ones
+
+# Pre-compute one LUT per matrix constant
+for k in range(16):
+    c = const_matrix[k]
+    lut = [0] * 256
+    for a in range(256):
+        if a == 0 or c == 0:
+            lut[a] = 0
+        else:
+            # 32-bit addition before mod — mirrors the C++ promotion bug
+            sum_log = (LOG_DATA[a] + LOG_DATA[c]) % 255
+            lut[a] = EXP_DATA[sum_log]
+    # Load lut into Z3 as a static array ...</code></pre>
+      <p>
+        With the 16 static LUT arrays in place, the state simulation becomes a chain of
+        <code>z3.Select</code> calls and <code>XOR</code> operations, and the solver finds
+        the flag trivially.
+      </p>
+
+      <h2>Result</h2>
+      <pre><code>[*] Building optimized state graph...
+[*] Running QF_BV Solver...
+
+[+] Flag found: KARITY{secyh&gt;pnnss(g6&gt;* :e&gt;@&amp;&gt;:\-rt}</code></pre>
+
+      <h2>Key Takeaways</h2>
+      <ul>
+        <li>
+          When a binary builds its own crypto tables at runtime, always verify them against
+          a known reference — small corruptions silently destroy field properties.
+        </li>
+        <li>
+          C++ integer promotion in arithmetic operations can diverge from what you expect when
+          modelling at a smaller bit width in a symbolic solver.
+        </li>
+        <li>
+          Pre-computing LUTs for heavy non-linear operations and injecting them as static Z3
+          arrays is a reliable way to make otherwise unmanageable constraint sets tractable.
+        </li>
+      </ul>
+
+      <h2>Tools Used</h2>
+      <ul>
+        <li>IDA Pro (static analysis, field arithmetic identification)</li>
+        <li>Z3 (Python bindings — QF_BV solver with pre-computed LUTs)</li>
+      </ul>
+
+    </div>
+
+    <nav class="wu-article-nav">
+      <a href="index.html" class="btn btn-ghost">← All Writeups</a>
+    </nav>
+
+  </article>
+
+  <footer class="footer">
+    <div class="container">
+      <p class="footer-logo"><span class="bracket">[</span>Tony<span class="accent">.</span>Chong<span class="bracket">]</span></p>
+      <p class="footer-sub"></p>
+    </div>
+  </footer>
+
+  <script src="../js/script.js"></script>
+</body>
+</html>
