@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>U Can't Pass | Tony Chong Writeups</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="../css/writeups.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+  <!-- ── Navbar ─────────────────────────────────────────── -->
+  <nav class="navbar scrolled" id="navbar">
+    <div class="nav-container">
+      <a href="../index.html" class="nav-logo">
+        <span class="bracket">[</span>Tony<span class="accent">.</span>Chong<span class="bracket">]</span>
+      </a>
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="../index.html" class="nav-link">Home</a></li>
+        <li><a href="index.html"    class="nav-link nav-wu active">Writeups</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- ── Writeup article ────────────────────────────────── -->
+  <article class="wu-article">
+
+    <div class="back-link"><a href="index.html">← Back to Writeups</a></div>
+
+    <header class="wu-article-header">
+      <div class="wu-article-tags">
+        <span class="wc-tag">Crackme</span>
+        <span class="wc-tag">Rev</span>
+        <span class="wc-diff easy">Easy</span>
+      </div>
+      <h1 class="wu-article-title">U Can't Pass</h1>
+      <div class="wu-article-meta">
+        <span>📅 May 2026</span>
+        <span>🏆 crackmes.one</span>
+        <span>🔖 Reverse Engineering</span>
+      </div>
+    </header>
+
+    <div class="wu-body">
+
+      <h2>Overview</h2>
+      <p>
+        This is my very first reverse engineering writeup. I wouldn't call it a "challenge" —
+        it's more of an introduction to the process. The crackme is a stripped-down Linux ELF
+        that does nothing but compare a hardcoded value against itself and print a result. Simple
+        as it sounds, working through it is a decent first exercise in reading GDB disassembly
+        output and mentally reconstructing the original C code.
+      </p>
+      <p>
+        <strong>Environment:</strong> WSL (Ubuntu) &nbsp;|&nbsp; <strong>Tools:</strong> GDB
+      </p>
+
+      <h2>Loading the Binary</h2>
+      <p>
+        After navigating to the directory containing the crackme, I attached GDB to it:
+      </p>
+      <pre><code>gdb main.out</code></pre>
+      <p>
+        Then disassembled <code>main</code> to see the full function body:
+      </p>
+      <pre><code>disassemble main</code></pre>
+
+      <h2>Raw Disassembly</h2>
+      <pre><code>(gdb) disassemble main
+Dump of assembler code for function main:
+   0x0000000000001150 &lt;+0&gt;:    endbr64
+   0x0000000000001154 &lt;+4&gt;:    push   %rbp
+   0x0000000000001155 &lt;+5&gt;:    mov    %rsp,%rbp
+   0x0000000000001158 &lt;+8&gt;:    sub    $0x10,%rsp
+   0x000000000000115c &lt;+12&gt;:   movl   $0x0,-0x4(%rbp)
+   0x0000000000001163 &lt;+19&gt;:   lea    0xe9a(%rip),%rdi        # 0x2004
+   0x000000000000116a &lt;+26&gt;:   mov    $0x0,%al
+   0x000000000000116c &lt;+28&gt;:   call   0x1050 &lt;printf@plt&gt;
+   0x0000000000001171 &lt;+33&gt;:   movl   $0xa,-0x8(%rbp)
+   0x0000000000001178 &lt;+40&gt;:   cmpl   $0xa,-0x8(%rbp)
+   0x000000000000117c &lt;+44&gt;:   je     0x118e &lt;main+62&gt;
+   0x000000000000117e &lt;+46&gt;:   lea    0xeab(%rip),%rdi        # 0x2030
+   0x0000000000001185 &lt;+53&gt;:   mov    $0x0,%al
+   0x0000000000001187 &lt;+55&gt;:   call   0x1050 &lt;printf@plt&gt;
+   0x000000000000118c &lt;+60&gt;:   jmp    0x11a4 &lt;main+84&gt;
+   0x000000000000118e &lt;+62&gt;:   cmpl   $0xa,-0x8(%rbp)
+   0x0000000000001192 &lt;+66&gt;:   jne    0x11a2 &lt;main+82&gt;
+   0x0000000000001194 &lt;+68&gt;:   lea    0xe9f(%rip),%rdi        # 0x203a
+   0x000000000000119b &lt;+75&gt;:   mov    $0x0,%al
+   0x000000000000119d &lt;+77&gt;:   call   0x1050 &lt;printf@plt&gt;
+   0x00000000000011a2 &lt;+82&gt;:   jmp    0x11a4 &lt;main+84&gt;
+   0x00000000000011a4 &lt;+84&gt;:   mov    -0x4(%rbp),%eax
+   0x00000000000011a7 &lt;+87&gt;:   add    $0x10,%rsp
+   0x00000000000011ab &lt;+91&gt;:   pop    %rbp
+   0x00000000000011ac &lt;+92&gt;:   ret
+End of assembler dump.</code></pre>
+
+      <h2>Annotated Walkthrough</h2>
+      <p>Going through each instruction and what it actually means:</p>
+      <pre><code>endbr64
+  ; Security marker — marks a valid indirect-call target. No logic, can be ignored.
+
+push %rbp
+  ; Save the caller's base pointer onto the stack.
+mov %rsp, %rbp
+  ; Set up a new stack frame — rbp now points to the top of our frame.
+sub $0x10, %rsp
+  ; Reserve 16 bytes for local variables.
+
+movl $0x0, -0x4(%rbp)
+  ; int a = 0
+
+lea 0xe9a(%rip), %rdi   # 0x2004
+  ; Load address of the greeting/prompt string into the first argument register.
+mov $0x0, %al
+  ; Zero float-arg count — required by x86-64 ABI for variadic calls.
+call printf@plt
+  ; printf(greeting)
+
+movl $0xa, -0x8(%rbp)
+  ; int b = 10
+
+cmpl $0xa, -0x8(%rbp)
+  ; Compare b with 10.
+je main+62
+  ; if (b == 10) jump to main+62 — ALWAYS true, always taken.
+
+; ── Dead code (never reached) ──────────────────────────
+lea 0xeab(%rip), %rdi   # 0x2030
+call printf@plt
+  ; printf(SUCCESS_string)   ← unreachable
+jmp main+84
+; ───────────────────────────────────────────────────────
+
+; main+62:
+cmpl $0xa, -0x8(%rbp)
+  ; Compare b with 10 again — still 10.
+jne main+82
+  ; if (b != 10) jump to main+82 — NEVER true, never taken.
+
+lea 0xe9f(%rip), %rdi   # 0x203a
+  ; Load the FAILURE string into the first argument register.
+call printf@plt
+  ; printf(FAILURE_string)   ← always executes
+
+; main+82 / main+84:
+mov -0x4(%rbp), %eax
+  ; return a; → return 0
+add $0x10, %rsp
+  ; Release local variable space.
+pop %rbp
+  ; Restore caller's base pointer.
+ret
+  ; Return to caller.</code></pre>
+
+      <h2>Reconstructed C Code</h2>
+      <p>
+        Translating the assembly back to C makes the logic — and its absurdity — obvious:
+      </p>
+      <pre><code>int main() {
+    int a = 0;
+    int b = 10;
+
+    printf(greeting);       // always printed
+
+    if (b == 10)            // ALWAYS true → jumps over success
+        goto skip_success;
+
+    printf(SUCCESS);        // dead code — never reached
+
+skip_success:
+    if (b != 10)            // ALWAYS false → never jumps
+        goto skip_failure;
+
+    printf(FAILURE);        // always printed
+
+skip_failure:
+    return a;               // return 0
+}</code></pre>
+      <p>
+        The program sets <code>b = 10</code> and immediately compares it to <code>10</code>.
+        The first branch is always taken, vaulting over the success print. The second branch is
+        never taken, so the failure print always runs. There is no user input and no way to
+        "pass" — the outcome is hardwired at compile time.
+      </p>
+
+      <h2>Key Takeaways</h2>
+      <ul>
+        <li>
+          The full reverse engineering loop — load binary → disassemble → annotate instructions
+          → reconstruct source — is the same regardless of crackme complexity. This one just
+          makes every step short.
+        </li>
+        <li>
+          <code>endbr64</code> is a Control-flow Enforcement Technology (CET) marker. It has
+          no effect on the program's logic and can be skipped during analysis.
+        </li>
+        <li>
+          The x86-64 System V ABI requires zeroing <code>%al</code> before a variadic call
+          (like <code>printf</code>) to indicate no floating-point register arguments are
+          being passed.
+        </li>
+        <li>
+          Dead code — branches that can never be reached — is something to watch for. The
+          compiler or author may have intentionally or accidentally left it; it still needs to
+          be identified so you don't chase non-existent logic paths.
+        </li>
+      </ul>
+
+      <h2>Tools Used</h2>
+      <ul>
+        <li>GDB (disassembly and annotation)</li>
+        <li>WSL / Ubuntu (execution environment)</li>
+      </ul>
+
+    </div>
+
+    <nav class="wu-article-nav">
+      <a href="index.html" class="btn btn-ghost">← All Writeups</a>
+    </nav>
+
+  </article>
+
+  <footer class="footer">
+    <div class="container">
+      <p class="footer-logo"><span class="bracket">[</span>Tony<span class="accent">.</span>Chong<span class="bracket">]</span></p>
+      <p class="footer-sub"></p>
+    </div>
+  </footer>
+
+  <script src="../js/script.js"></script>
+</body>
+</html>
