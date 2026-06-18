@@ -51,80 +51,56 @@
 
       <h2>Overview</h2>
       <p>
-        CrackMeBaby2 is a two-stage
-        challenge: first find a password hidden behind a layer of XOR obfuscation, then answer a
-        follow-up prompt. 
+        CrackMeBaby2 is a short two-stage crackme. The first stage hides the real password behind
+        a fake flag and a simple XOR check, and the second stage asks for the author's name.
       </p>
       <p><strong>Binary:</strong> CanYouCrackMeBaby2.exe &nbsp;|&nbsp; <strong>Arch:</strong> x86-64 PE (Windows)</p>
 
-      <h2>Step 1 — Anti-Debug</h2>
+      <h2>Step 1 — Avoid the Anti-Debug</h2>
       <p>
-        Before presenting the password prompt, the binary calls
-        <code>CreateToolhelp32Snapshot</code> and walks the running process list with
-        <code>Process32First</code> / <code>Process32Next</code>. It compares each process name
-        against a hardcoded list of common debuggers:
-        <code>x64dbg.exe</code>, <code>ida.exe</code>, <code>ollydbg.exe</code>, and others. A
-        match triggers a message box and an immediate exit.
-      </p>
-      <p>
-        The quickest bypass is static analysis — load the binary in IDA without attaching a
-        live debugger. If you need dynamic analysis, patch the conditional jump immediately after
-        the anti-debug routine from <code>jz</code> to <code>jmp</code> to skip the exit path.
+        The binary checks for common debugger processes before doing anything else. I avoided that
+        by staying in static analysis and reading the logic in IDA instead of stepping through it.
       </p>
 
-      <h2>Step 2 — Finding main</h2>
+      <h2>Step 2 — Find the Real Check</h2>
       <p>
-        Open the Strings window (<kbd>Shift+F12</kbd>) and search for <code>"Input the pass:"</code>.
-        Cross-referencing that string (<kbd>X</kbd>) drops you directly inside <code>main</code>.
-      </p>
-
-      <h2>Step 3 — The Fake Flag</h2>
-      <p>
-        The first check in <code>main</code> is bait. It compares the input to a hardcoded 20-byte
-        string using <code>memcmp</code>:
+        I searched for <code>"Input the pass:"</code> in the Strings window and followed the
+        cross-reference into <code>main</code>. The first comparison looks like the answer, but it
+        is only bait:
       </p>
       <pre><code>if (len == 20 &amp;&amp; !memcmp(input, "flag{can-you-crack?}", 20))</code></pre>
       <p>
-        Entering this prints <code>"Access Denied"</code>. It is a red herring for anyone
-        who found it by grepping strings instead of reading the code flow. The real check is
-        on the else branch.
+        If you enter that string, the program still says <code>"Access Denied"</code>, so the
+        real path is elsewhere.
       </p>
 
-      <h2>Step 4 — XOR Obfuscation</h2>
+      <h2>Step 3 — Reverse the XOR</h2>
       <p>
-        If the fake-flag comparison fails, the program enters a loop that XORs every byte of the
-        input with the constant <code>0x0A</code>, then compares the result to a stored
-        ciphertext:
+        The real check XORs the input with <code>0x0A</code> and compares it to a stored string.
       </p>
       <pre><code>for (i = 0; i &lt; len; i++)
     input[i] ^= 0x0A;
 if (len == 18 &amp;&amp; !memcmp(xored_input, "lfkm0cmx:~'~boacdm", 18))</code></pre>
       <p>
-        In the IDA disassembly the XOR shows up as:
-      </p>
-      <pre><code>140001e40   xor   byte ptr [rax+rcx], 0Ah</code></pre>
-      <p>
-        Because XOR is its own inverse, recovering the password is a one-liner — just apply the
-        same key to the ciphertext:
+        Since XOR can be reversed with the same key, I decoded the stored value and got the real
+        password:
       </p>
       <pre><code>>>> ''.join(chr(ord(c) ^ 0x0A) for c in "lfkm0cmx:~'~boacdm")
 'flag:igr0t-theking'</code></pre>
       <p><strong>Password:</strong> <code>flag:igr0t-theking</code></p>
 
-      <h2>Step 5 — Stage 2</h2>
+      <h2>Step 4 — Answer the Second Prompt</h2>
       <p>
-        Entering the correct password does not end the challenge. The program responds with
-        <code>"You are good, but..."</code> and then asks:
+        After the password, the program asks one more question:
       </p>
       <pre><code>Say my name...</code></pre>
       <p>
-        The comparison this time is a plain <code>memcmp</code> against a literal string:
+        This check is simple. The answer is just the author's handle: <code>igr0t</code>.
       </p>
       <pre><code>if (len == 5 &amp;&amp; !memcmp(input2, "igr0t", 5))
     print("You Win.. (;");</code></pre>
-      <p>The answer is just the author's handle: <code>igr0t</code></p>
 
-      <h2>Full Run</h2>
+      <h2>Result</h2>
       <pre><code>Input the pass: flag:igr0t-theking
 You are good , but...
 Say my name... igr0t
@@ -132,9 +108,9 @@ You Win.. (;</code></pre>
 
       <h2>Key Takeaways</h2>
       <ul>
-        <li>Process-list anti-debug is easy to bypass statically — no patching needed if you stay in IDA.</li>
-        <li>Fake flags placed on the string-search path are a classic misdirection; always follow the actual code flow.</li>
-        <li>XOR with a single-byte key is trivially reversible once you identify the key in the disassembly.</li>
+        <li>Check the real code path instead of trusting the first flag-looking string you see.</li>
+        <li>Simple XOR protection is easy to reverse once you find the key.</li>
+        <li>Some crackmes use a second prompt to make sure you actually followed the full flow.</li>
       </ul>
 
       <h2>Tools Used</h2>
